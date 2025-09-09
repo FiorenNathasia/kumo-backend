@@ -13,6 +13,7 @@ app.use("/api/auth", authRouter);
 app.use(verify);
 
 app.use("/api/entry", entryRouter);
+app.use("/api/task", entryRouter);
 
 const PORT = process.env.PORT || 5050;
 

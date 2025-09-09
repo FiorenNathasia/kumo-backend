@@ -2,9 +2,8 @@ const db = require("../db/db");
 
 //POST new journal entry
 const newEntry = async (req, res) => {
-  const { text, moods } = req.body;
   const userId = res.locals.userId;
-
+  const { text, moods } = req.body;
   try {
     const entryDate = new Date().toISOString().split("T")[0];
     const entryText = text || "";
@@ -72,7 +71,12 @@ const getEntry = async (req, res) => {
       .select()
       .first();
 
+    //Get the emojis and the meaning of them
+    //First access the daily_entry_moods table
     const entryMoods = await db("daily_entry_moods")
+      //1.Join the moods table + the mood_id collum in daily_entry_moods, and the id collumn in mood table
+      //2.Look in daily_entry_id collumn and match with current entry id
+      //3.Get the asscosciated emojis and meaning for that newJournal entry
       .join("moods", "daily_entry_moods.mood_id", "moods.id")
       .where("daily_entry_moods.daily_entry_id", entry.id)
       .select("moods.emojis", "moods.meaning");
@@ -94,9 +98,14 @@ const getEntries = async (req, res) => {
       .orderBy("date", "desc")
       .select("*");
 
-    const entriesIds = entries.map((j) => j.id);
+    const entriesIds = entries.map((e) => e.id);
 
+    //Get the emojis and the meaning of them
+    //First access the daily_entry_moods table
     const entryMoods = await db("daily_entry_moods")
+      //1.Join the moods table + the mood_id collum in daily_entry_moods, and the id collumn in mood table
+      //2.Look in daily_entry_id collumn and match with current newJournal's id
+      //3.Get the asscosciated daily_entry_id, emojis and meaning for that newJournal entry
       .join("moods", "daily_entry_moods.mood_id", "moods.id")
       .whereIn("daily_entry_moods.daily_entry_id", entriesIds)
       .select(
@@ -104,10 +113,14 @@ const getEntries = async (req, res) => {
         "moods.emojis",
         "moods.meaning"
       );
+
+    // Go through each journal entry
     const entryWithMoods = entries.map((entry) => ({
       ...entry,
+      // For this entry, find all moods in entryMoods that match its id
       moods: entryMoods
         .filter((m) => m.daily_entry_id === entry.id)
+        // From those moods, keep only the emoji and meaning fields
         .map((m) => ({ emojis: m.emojis, meaning: m.meaning })),
     }));
 
@@ -121,14 +134,56 @@ const getEntries = async (req, res) => {
 const editEntry = async (req, res) => {
   const userId = res.locals.userId;
   const entryId = req.params.id;
-  const { text, moods } = req.body;
+  const { text, addMoods = [], removeMoods = [] } = req.body;
 
   try {
+    let entry = await db("daily_entries")
+      .where({ id: entryId, user_id: userId })
+      .first();
+
+    // If the user provided new text for the entry
+    if (text !== undefined) {
+      // Update the entry text and timestamp in the daily_entries table
+      await db("daily_entries")
+        .where({ id: entryId, user_id: userId })
+        .update({ journal: text });
+    }
+
+    //If the user want to remove moods
+    if (removeMoods.length > 0) {
+      //Access the daily_entry_moods table
+      await db("daily_entry_moods")
+        // Delete rows from the join table where entry matches and mood_id is in removeMoods
+        .where({ daily_entry_id: entryId })
+        .whereIn("mood_id", removeMoods)
+        .del();
+    }
+
+    // For each mood the user wants to add
+    for (const moodId of addMoods) {
+      // Check if this entry already has that mood
+      const exists = await db("daily_entry_moods")
+        .where({
+          daily_entry_id: entryId,
+          mood_id: moodId,
+        })
+        .first();
+
+      // If not, insert a new row linking the entry to the mood
+      if (!exists) {
+        await db("daily_entry_moods").insert({
+          daily_entry_id: entryId,
+          mood_id: moodId,
+        });
+      }
+    }
+    res.status(200).send({ message: "Journal updated successfully" });
   } catch (error) {
     console.log(error);
     return res.status(400).send({ message: "Error editing journal" });
   }
 };
+
 module.exports = {
   newEntry,
   getEntry,
