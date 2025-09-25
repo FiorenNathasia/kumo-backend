@@ -1,4 +1,6 @@
 const db = require("../db/db");
+const { combinedMoods } = require("../util/moodRulesLogic.js");
+const { aiRecommendation } = require("../util/aiRecommendation.js");
 
 //POST new journal entry
 const newEntry = async (req, res) => {
@@ -51,6 +53,14 @@ const newEntry = async (req, res) => {
       .join("moods", "daily_entry_moods.mood_id", "moods.id")
       .where("daily_entry_moods.daily_entry_id", newEntry.id)
       .select("moods.emojis", "moods.meaning");
+
+    const selectedMoods = entryMoods.map((m) => m.meaning);
+
+    const combined = combinedMoods(selectedMoods);
+    console.log(combined);
+
+    const recommendationData = aiRecommendation(combined);
+    console.log(recommendationData);
 
     res.status(200).send({ data: { ...newEntry, moods: entryMoods } });
   } catch (error) {
