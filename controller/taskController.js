@@ -2,7 +2,7 @@ const db = require("../db/db");
 
 const newTask = async (req, res) => {
   const userId = res.locals.userId;
-  const { title, difficulty, deadline, notes } = req.body;
+  const { title, difficulty, deadline, notes, categories } = req.body;
 
   try {
     const [newTask] = await db("tasks")
@@ -14,6 +14,29 @@ const newTask = async (req, res) => {
         notes,
       })
       .returning("*");
+
+    //If there is a categories, it is an array, and the length is >0
+    //1.Access the "categories" table
+    //2.Look in the column name and mathc it to the given categories
+    //3.Take the id of the matched names
+    if (categories && Array.isArray(categories) && categories.length > 0) {
+      const categoriesId = await db("categories")
+        .whereIn("name", categories)
+        .pluck("id");
+
+      //Loop through the found ids in categoriesId
+      //Set task_id to the id of the newTask
+      //Set catergory_id to the id from the categoriesId
+      const categoryLinks = categoriesId.map((id) => ({
+        task_id: newTask.id,
+        category_id: id,
+      }));
+
+      //Then insert categoryLinks to the table "tasks_categories"
+      if (categoryLinks.length > 0) {
+        await db("tasks_categories").insert(categoryLinks);
+      }
+    }
 
     res.status(201).send({ data: newTask });
   } catch (error) {

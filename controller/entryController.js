@@ -1,6 +1,7 @@
 const db = require("../db/db");
 const { combinedMoods } = require("../util/moodRulesLogic.js");
 const { aiRecommendation } = require("../util/aiRecommendation.js");
+const chatgpt = require("../util/openai.js");
 
 //POST new journal entry
 const newEntry = async (req, res) => {
@@ -54,13 +55,41 @@ const newEntry = async (req, res) => {
       .where("daily_entry_moods.daily_entry_id", newEntry.id)
       .select("moods.emojis", "moods.meaning");
 
+    //Get all the task for current user
+    const userTasks = await db("tasks").where({ user_id: userId }).select();
+    console.log(userTasks);
+
+    let allTaskCategories = [];
+    //Loop through al the task for current user
+    for (task of userTasks) {
+      //1.Access the table tasks_categories table
+      //2.Join the categories table + the category_id from tasks_categories table + id of the categories in categories table
+      //3.Look into the task_id column and match with the ids of the current users task
+      //4.Get the name and description of the categories for the current user's tasks
+      const taskCategories = await db("tasks_categories")
+        .join("categories", "tasks_categories.category_id", "categories.id")
+        .where("tasks_categories.task_id", task.id)
+        .select("categories.name", "categories.description");
+
+      allTaskCategories.push({ taskId: task.id, categories: taskCategories });
+    }
+
+    //Go through entryMoods and get the meaning for each mood
     const selectedMoods = entryMoods.map((m) => m.meaning);
 
+    //Pass through selectedMoods to combineMoods function
     const combined = combinedMoods(selectedMoods);
-    console.log(combined);
 
+    //Pass through combined to aiRecommendation funtion
     const recommendationData = aiRecommendation(combined);
-    console.log(recommendationData);
+
+    //Pass through recommendationData, taskCategories, moods, and newEntry to chatgpt function
+    const chatpgtRecommendations = await chatgpt({
+      recommendationData,
+      taskCategories: allTaskCategories,
+      moods: selectedMoods,
+      entry: newEntry.journal,
+    });
 
     res.status(200).send({ data: { ...newEntry, moods: entryMoods } });
   } catch (error) {

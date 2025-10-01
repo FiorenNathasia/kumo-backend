@@ -1,5 +1,7 @@
 function aiRecommendation(combined) {
+  //Extract the given avgEnergyLevel and sortedCat object
   const { avgEnergyLevel, sortedCat } = combined;
+  //Initialized both taskCOunt and difficulty variable
   let taskCount;
   let difficulty;
 
