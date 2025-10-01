@@ -3,11 +3,17 @@ const openAiKey = process.env.OPEN_AI_KEY;
 
 const energyToneMapping = {
   1: "calming, soothing, low-energy",
-  2: "neutral, balanced, moderate=energy",
+  2: "neutral, balanced, moderate-energy",
   3: "upbeat, energtic, high-energy",
 };
 
-async function chatgpt(recommendationData, taskCategories, moods, entry) {
+async function chatgpt({
+  recommendationData,
+  allTaskCategories,
+  moods,
+  entry = " ",
+  userTasks,
+}) {
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${openAiKey}`,
@@ -15,31 +21,32 @@ async function chatgpt(recommendationData, taskCategories, moods, entry) {
 
   const avgEnergy = recommendationData?.avgEnergyLevel || 2;
   const tone =
-    energyToneMapping[Math.round(avgEnergyLevel)] ||
+    energyToneMapping[Math.round(avgEnergy)] ||
     "neutral, balanced, moderate=energy";
 
-  const userPrompt = `You are a task recommendation assistant. Generate a JSON onject ONLY with this structure:
-    {
-    "success": true,
-    "tasks": [
-        {
-        "task": "<task text reflecting tone>", 
-        "category": "<category>",
-        "urgency": "<low|medium|high>",
-        "tone": "<tone>",
-        "icon": "<icon name>",
-        "color": "<hex color code>"
-        }
-      ]
-    }
+  const userPrompt = `Return ONLY tasks from this exact list: ${JSON.stringify(
+    userTasks
+  )}. 
+Never create new tasks. 
+Always include 1–2 tasks if at least one matches. 
+Return them in the same format as shown.
 
-    Requirements:
-  1. Use the following user task categories: ${JSON.stringify(taskCategories)}.
-2. Use the user's moods: ${JSON.stringify(moods)}.
-3. Apply the tone: ${tone} to the text of each task.
-4. Use entry text if provided: "${entry}".
-5. Always return valid JSON only.
+Rules:
+1. Select up to ${recommendationData.taskCount} tasks.
+2. Only include tasks with difficulty "${recommendationData.difficulty}".
+3. Consider avgEnergyLevel = ${
+    recommendationData.avgEnergyLevel
+  } → tone = "${tone}".
+4. Prioritize categories from sortedCat: ${JSON.stringify(
+    recommendationData.sortedCat
+  )}.
+5. Match task categories from allTaskCategories: ${JSON.stringify(
+    allTaskCategories
+  )}.
+6. Consider moods: ${JSON.stringify(moods)}.
+7. Journal entry: "${entry}".
     `;
+
   try {
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
@@ -48,8 +55,12 @@ async function chatgpt(recommendationData, taskCategories, moods, entry) {
         messages: [
           {
             role: "system",
-            content:
-              "You are a helpful assistant that only responds in valid JSON and styles the text based on the provided tone.",
+            content: `You are a strict task recommender. 
+You must ONLY return tasks from the provided "usersTasks" list.
+You are NOT allowed to create or invent new tasks. 
+Always return 1–2 tasks if possible. 
+Only return {"success": true, "tasks": []} if literally no tasks exist. 
+Output must always be valid JSON.`,
           },
           {
             role: "user",
@@ -67,3 +78,5 @@ async function chatgpt(recommendationData, taskCategories, moods, entry) {
     return { success: false, tasks: [] };
   }
 }
+
+module.exports = chatgpt;

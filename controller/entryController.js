@@ -19,7 +19,6 @@ const newEntry = async (req, res) => {
       })
       .returning("*");
 
-    let moodsLinks = [];
     //If there are content in moods req.body,
     //And moods is an array,
     //And the length of moods req.body is greater than 0
@@ -57,7 +56,6 @@ const newEntry = async (req, res) => {
 
     //Get all the task for current user
     const userTasks = await db("tasks").where({ user_id: userId }).select();
-    console.log(userTasks);
 
     let allTaskCategories = [];
     //Loop through al the task for current user
@@ -83,15 +81,30 @@ const newEntry = async (req, res) => {
     //Pass through combined to aiRecommendation funtion
     const recommendationData = aiRecommendation(combined);
 
+    console.log(
+      "Recommendation Data:",
+      recommendationData,
+      "All Task Categories and ID:",
+      allTaskCategories,
+      "Moods:",
+      selectedMoods,
+      "Journal Entry:",
+      newEntry.journal,
+      "Users Tasks:",
+      userTasks
+    );
     //Pass through recommendationData, taskCategories, moods, and newEntry to chatgpt function
     const chatpgtRecommendations = await chatgpt({
       recommendationData,
-      taskCategories: allTaskCategories,
+      allTaskCategories,
       moods: selectedMoods,
       entry: newEntry.journal,
+      userTasks,
     });
 
-    res.status(200).send({ data: { ...newEntry, moods: entryMoods } });
+    res.status(200).send({
+      data: { ...newEntry, moods: entryMoods, chatpgtRecommendations },
+    });
   } catch (error) {
     console.log(error);
     return res.status(400).send({ message: "Error adding journal" });
