@@ -45,6 +45,7 @@ Rules:
   )}.
 6. Consider moods: ${JSON.stringify(moods)}.
 7. Journal entry: "${entry}".
+8. Include an encouraging message with the given ${tone} 
     `;
 
   try {
@@ -58,9 +59,20 @@ Rules:
             content: `You are a strict task recommender. 
 You must ONLY return tasks from the provided "usersTasks" list.
 You are NOT allowed to create or invent new tasks. 
-Always return 1–2 tasks if possible. 
-Only return {"success": true, "tasks": []} if literally no tasks exist. 
-Output must always be valid JSON.`,
+
+Output format must ALWAYS be valid JSON like this:
+{
+  "success": true,
+"message": "<Encouraging personal message that acknowledges the user's mood or entry, reflects the tone, and starts with 'I recommend doing these tasks...'>",
+  "tasks": [ ...tasks from usersTasks... ]
+}
+Rules:
+- Make the message warm, personal, and encouraging.
+- Use the user's moods and journal entry if provided.
+- Weave in the tone naturally (e.g. 'calm and soothing', 'upbeat and energetic').
+- Always return 1–2 tasks if possible.
+- If no tasks match, return:
+  { "success": true, "message": "I couldn't find any suitable tasks right now, but take care of yourself.", "tasks": [] }`,
           },
           {
             role: "user",
