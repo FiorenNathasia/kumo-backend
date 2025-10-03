@@ -24,8 +24,18 @@ async function chatgpt({
     energyToneMapping[Math.round(avgEnergy)] ||
     "neutral, balanced, moderate=energy";
 
+  const now = new Date();
+  const soonThresehold = 3 * 24 * 60 * 60 * 1000;
+  const taskDueSoon = userTasks.map((task) => {
+    const deadLine = new Date(task.deadline);
+    return {
+      ...task,
+      isDueSoon: deadLine - now <= soonThresehold, // true if overdue or due soon
+    };
+  });
+
   const userPrompt = `Return ONLY tasks from this exact list: ${JSON.stringify(
-    userTasks
+    taskDueSoon
   )}. 
 Never create new tasks. 
 Always include 1–2 tasks if at least one matches. 
@@ -45,6 +55,7 @@ Rules:
   )}.
 6. Consider moods: ${JSON.stringify(moods)}.
 7. Journal entry: "${entry}".
+8. Tasks with "isDueSoon": true should be prioritized even if don't fit mood, difficulty, and energy.
 8. Include an encouraging message with the given ${tone} 
     `;
 
@@ -71,6 +82,9 @@ Rules:
 - Use the user's moods and journal entry if provided.
 - Weave in the tone naturally (e.g. 'calm and soothing', 'upbeat and energetic').
 - Always return 1–2 tasks if possible.
+9. ALWAYS include these tasks due soon (within 3 days): ${JSON.stringify(
+              taskDueSoon
+            )}
 - If no tasks match, return:
   { "success": true, "message": "I couldn't find any suitable tasks right now, but take care of yourself.", "tasks": [] }`,
           },
