@@ -34,6 +34,8 @@ async function chatgpt({
     };
   });
 
+  console.log("Task urgency:", taskWithUrgency);
+
   const userPrompt = `Return ONLY tasks from this exact list: ${JSON.stringify(
     taskWithUrgency
   )}. 
@@ -103,6 +105,8 @@ Rules:
       { headers }
     );
     const reply = JSON.parse(response.data.choices[0].message.content);
+    reply.tone = tone; // e.g., "calming, soothing, low-energy"
+    reply.energyLevel = avgEnergy;
     console.log(reply);
     if (!reply.tasks || !Array.isArray(reply.tasks)) {
       reply.tasks = [];
