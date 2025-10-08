@@ -1,6 +1,8 @@
 const axios = require("axios");
 const openAiKey = process.env.OPEN_AI_KEY;
 
+//Create an object that determine the tone that will be used
+//Should be based on the scale of the energy level to be compared to
 const energyToneMapping = {
   1: "calming, soothing, low-energy",
   2: "neutral, balanced, moderate-energy",
@@ -19,13 +21,26 @@ async function chatgpt({
     Authorization: `Bearer ${openAiKey}`,
   };
 
+  //Set the avgEnergyLevel from the passed recommendationData,
+  //If it can't be retrieved, set it to the 2 (middle)
   const avgEnergy = recommendationData?.avgEnergyLevel || 2;
+
+  //Set the tone by rounding the avgEnerfy to the nearest interger
+  //Use the rounded avgEnergy and match it to the appropriate number from the energyToneMapping object
+  //If this can't be done, set it to the "neutral" or middle tone
   const tone =
     energyToneMapping[Math.round(avgEnergy)] ||
     "neutral, balanced, moderate=energy";
 
+  //Get the date for today
   const now = new Date();
+  //This determines how far ahead the due date is (3days)
   const soonThresehold = 3 * 24 * 60 * 60 * 1000;
+  //Map throught the current user's tasks
+  //Get the deadline from each task
+  //Add isDueSoon (truthy falsy) by subtracting the current date from the deadline
+  //If it is less or equal to the set days is soonThresehold (3 days), set to true
+  //Return the array of task object, that includes dueSoon in every task
   const taskWithUrgency = userTasks.map((task) => {
     const deadLine = new Date(task.deadline);
     return {
@@ -34,8 +49,7 @@ async function chatgpt({
     };
   });
 
-  console.log("Task urgency:", taskWithUrgency);
-
+  //Write the userPrompt to be used for the Open AI call
   const userPrompt = `Return ONLY tasks from this exact list: ${JSON.stringify(
     taskWithUrgency
   )}. 
@@ -105,23 +119,34 @@ Rules:
       { headers }
     );
     const reply = JSON.parse(response.data.choices[0].message.content);
+    //Add the tone to the reply
     reply.tone = tone; // e.g., "calming, soothing, low-energy"
+    //Add the energyLevel to the reply
     reply.energyLevel = avgEnergy;
-    console.log(reply);
+
+    //If there are no tasks to the reply
+    //Or the tasks in reply isn't an array
+    //Add an empty array to the tasks key in the object
     if (!reply.tasks || !Array.isArray(reply.tasks)) {
       reply.tasks = [];
     }
 
+    //Go through the userTasks and filter out the tasks that are due soon
     const dueSoonTasks = userTasks.filter(
       (t) => new Date(t.deadline) - now <= soonThresehold
     );
+
+    //Loop through tasks in dueSoonTasks
+    //If there is no match of the task from dueSoonTasks to the task in the reply
+    //Push the task from the dueSoonTasks into the reply task array
     for (const task of dueSoonTasks) {
       if (!reply.tasks.some((t) => t.id === task.id)) {
         reply.tasks.push(task);
       }
     }
+
+    //Go through the tasks in reply, sort the tasks by the clossest deadline
     reply.tasks.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-    console.log("Final reply:", reply);
     return reply;
   } catch (error) {
     console.error("GPT request failed:", error.response?.data || error.message);

@@ -81,18 +81,6 @@ const newEntry = async (req, res) => {
     //Pass through combined to aiRecommendation funtion
     const recommendationData = aiRecommendation(combined);
 
-    console.log(
-      "Recommendation Data:",
-      recommendationData,
-      "All Task Categories and ID:",
-      allTaskCategories,
-      "Moods:",
-      selectedMoods,
-      "Journal Entry:",
-      newEntry.journal,
-      "Users Tasks:",
-      userTasks
-    );
     //Pass through recommendationData, taskCategories, moods, and newEntry to chatgpt function
     const chatpgtRecommendations = await chatgpt({
       recommendationData,
@@ -101,6 +89,8 @@ const newEntry = async (req, res) => {
       entry: newEntry.journal,
       userTasks,
     });
+
+    console.log(chatpgtRecommendations);
 
     res.status(200).send({
       data: { ...newEntry, moods: entryMoods, chatpgtRecommendations },
