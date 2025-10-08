@@ -57,6 +57,8 @@ const newEntry = async (req, res) => {
     //Get all the task for current user
     const userTasks = await db("tasks").where({ user_id: userId }).select();
 
+    console.log(userTasks);
+
     let allTaskCategories = [];
     //Loop through al the task for current user
     for (task of userTasks) {
@@ -90,10 +92,34 @@ const newEntry = async (req, res) => {
       userTasks,
     });
 
-    console.log(chatpgtRecommendations);
+    //Get all the ids of the tasks being returned from chatpgtRecommendations
+    const suggestedTasksId = chatpgtRecommendations.tasks.map(
+      (task) => task.id
+    );
+
+    //Get all the ids of the task of the current user
+    const realTasksId = userTasks.map((task) => {
+      return task.id;
+    });
+
+    //Filter out the ids of tasks from suggestedTasksId that does not exist in the ids of the current user's tasks
+    const existingIds = suggestedTasksId.filter((id) =>
+      realTasksId.includes(id)
+    );
+
+    //Use the ids from existingIds to filter out tasks that ai might have made up
+    const chatgptTasks = chatpgtRecommendations.tasks.filter((task) =>
+      existingIds.includes(task.id)
+    );
+
+    //Reassign the chatgptTasks into the chatpgtRecommendations tasks
+    const finalChatgptRecommendation = {
+      ...chatpgtRecommendations,
+      tasks: chatgptTasks,
+    };
 
     res.status(200).send({
-      data: { ...newEntry, moods: entryMoods, chatpgtRecommendations },
+      data: { finalChatgptRecommendation },
     });
   } catch (error) {
     console.log(error);

@@ -114,10 +114,14 @@ Rules:
             content: userPrompt,
           },
         ],
+        // The "temperature" parameter controls how random or creative the AI's responses are.
         temperature: 0.7,
       },
       { headers }
     );
+
+    // The OpenAI API returns the content as a JSON-formatted string inside the response.
+    // JSON.parse() is needed to convert that string into a JavaScript object we can work with.
     const reply = JSON.parse(response.data.choices[0].message.content);
     //Add the tone to the reply
     reply.tone = tone; // e.g., "calming, soothing, low-energy"
