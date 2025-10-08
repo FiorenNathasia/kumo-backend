@@ -57,8 +57,6 @@ const newEntry = async (req, res) => {
     //Get all the task for current user
     const userTasks = await db("tasks").where({ user_id: userId }).select();
 
-    console.log(userTasks);
-
     let allTaskCategories = [];
     //Loop through al the task for current user
     for (task of userTasks) {
