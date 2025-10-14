@@ -1,123 +1,156 @@
 const db = require("../db/db");
-const { combinedMoods } = require("../util/moodRulesLogic.js");
-const { aiRecommendation } = require("../util/aiRecommendation.js");
-const chatgpt = require("../util/openai.js");
+const { createJournalEntry } = require("../services/journalService");
+const { getUserTasksWithCategories } = require("../services/taskService");
+const {
+  generateAIRecommendation,
+} = require("../services/aiRecommendationService");
+// const { combinedMoods } = require("../util/moodRulesLogic.js");
+// const { aiRecommendation } = require("../util/aiRecommendation.js");
+// const chatgpt = require("../util/openai.js");
 
 //POST new journal entry
 const newEntry = async (req, res) => {
   const userId = res.locals.userId;
   const { text, moods } = req.body;
   try {
-    const entryDate = new Date().toISOString().split("T")[0];
-    const entryText = text || "";
+    // const entryDate = new Date().toISOString().split("T")[0];
+    // const entryText = text || "";
+    // const [newEntry] = await db("daily_entries")
+    //   .insert({
+    //     user_id: userId,
+    //     date: entryDate,
+    //     journal: entryText,
+    //   })
+    //   .returning("*");
+    // //If there are content in moods req.body,
+    // //And moods is an array,
+    // //And the length of moods req.body is greater than 0
+    // if (moods && Array.isArray(moods) && moods.length > 0) {
+    //   //Get the id of the inserted moods from moods table
+    //   //And match the inserted moods to the emojis collumn form the moods table
+    //   //Then take the id of the found matched emojis
+    //   const moodsId = await db("moods").whereIn("emojis", moods).pluck("id");
+    //   //Make a new variable
+    //   //Where you then map through the moodsId array
+    //   //You first set the id of the journal entry to the collum in the table(daily_entry_moods)
+    //   //And then the id of the emojis that has been inserted for the collumn mood_id in the same table
+    //   const moodLinks = moodsId.map((id) => ({
+    //     daily_entry_id: newEntry.id,
+    //     mood_id: id,
+    //   }));
+    //   //If there is content in the moodLinks
+    //   if (moodLinks.length > 0) {
+    //     //In the table daily_entry_moods, insert the content of moodLinks
+    //     await db("daily_entry_moods").insert(moodLinks);
+    //   }
+    // }
+    // //Get the emojis and the meaning of them
+    // //First access the daily_entry_moods table
+    // const entryMoods = await db("daily_entry_moods")
+    //   //1.Join the moods table + the mood_id collum in daily_entry_moods, and the id collumn in mood table
+    //   //2.Look in daily_entry_id collumn and match with current newJournal's id
+    //   //3.Get the asscosciated emojis and meaning for that newJournal entry
+    //   .join("moods", "daily_entry_moods.mood_id", "moods.id")
+    //   .where("daily_entry_moods.daily_entry_id", newEntry.id)
+    //   .select("moods.emojis", "moods.meaning");
+    // //Get all the task for current user
+    // const userTasks = await db("tasks").where({ user_id: userId }).select();
+    // let allTaskCategories = [];
+    // //Loop through al the task for current user
+    // for (task of userTasks) {
+    //   //1.Access the table tasks_categories table
+    //   //2.Join the categories table + the category_id from tasks_categories table + id of the categories in categories table
+    //   //3.Look into the task_id column and match with the ids of the current users task
+    //   //4.Get the name and description of the categories for the current user's tasks
+    //   const taskCategories = await db("tasks_categories")
+    //     .join("categories", "tasks_categories.category_id", "categories.id")
+    //     .where("tasks_categories.task_id", task.id)
+    //     .select("categories.name", "categories.description");
+    //   allTaskCategories.push({ taskId: task.id, categories: taskCategories });
+    // }
+    // //Go through entryMoods and get the meaning for each mood
+    // const selectedMoods = entryMoods.map((m) => m.meaning);
+    // //Pass through selectedMoods to combineMoods function
+    // const combined = combinedMoods(selectedMoods);
+    // //Pass through combined to aiRecommendation funtion
+    // const recommendationData = aiRecommendation(combined);
+    // //Pass through recommendationData, taskCategories, moods, and newEntry to chatgpt function
+    // const chatpgtRecommendations = await chatgpt({
+    //   recommendationData,
+    //   allTaskCategories,
+    //   moods: selectedMoods,
+    //   entry: newEntry.journal,
+    //   userTasks,
+    // });
+    // //Get all the ids of the tasks being returned from chatpgtRecommendations
+    // const suggestedTasksId = chatpgtRecommendations.tasks.map(
+    //   (task) => task.id
+    // );
+    // //Get all the ids of the task of the current user
+    // const realTasksId = userTasks.map((task) => {
+    //   return task.id;
+    // });
+    // //Filter out the ids of tasks from suggestedTasksId that does not exist in the ids of the current user's tasks
+    // const existingIds = suggestedTasksId.filter((id) =>
+    //   realTasksId.includes(id)
+    // );
+    // //Use the ids from existingIds to filter out tasks that ai might have made up
+    // const chatgptTasks = chatpgtRecommendations.tasks.filter((task) =>
+    //   existingIds.includes(task.id)
+    // );
+    // //Reassign the chatgptTasks into the chatpgtRecommendations tasks
+    // const finalChatgptRecommendation = {
+    //   ...chatpgtRecommendations,
+    //   tasks: chatgptTasks,
+    // };
+    // res.status(200).send({
+    //   data: { finalChatgptRecommendation },
+    // });
+    const { entry, entryMoods } = await createJournalEntry(userId, text, moods);
+    const { userTasks, allTaskCategories } = await getUserTasksWithCategories(
+      userId
+    );
+    const finalChatgptRecommendation = await generateAIRecommendation({
+      entry,
+      entryMoods,
+      userTasks,
+      allTaskCategories,
+    });
 
-    const [newEntry] = await db("daily_entries")
+    console.log("AI RECOMMENDATION RESULT:", finalChatgptRecommendation);
+
+    const [aiRecommendation] = await db("ai_recommendations")
       .insert({
         user_id: userId,
-        date: entryDate,
-        journal: entryText,
+        daily_entry_id: entry.id,
+        success: finalChatgptRecommendation.success,
+        message: finalChatgptRecommendation.message,
+        tone: finalChatgptRecommendation.tone,
+        energy_level: finalChatgptRecommendation.energyLevel,
+        raw_response: finalChatgptRecommendation,
       })
       .returning("*");
 
-    //If there are content in moods req.body,
-    //And moods is an array,
-    //And the length of moods req.body is greater than 0
-    if (moods && Array.isArray(moods) && moods.length > 0) {
-      //Get the id of the inserted moods from moods table
-      //And match the inserted moods to the emojis collumn form the moods table
-      //Then take the id of the found matched emojis
-      const moodsId = await db("moods").whereIn("emojis", moods).pluck("id");
+    console.log(aiRecommendation);
 
-      //Make a new variable
-      //Where you then map through the moodsId array
-      //You first set the id of the journal entry to the collum in the table(daily_entry_moods)
-      //And then the id of the emojis that has been inserted for the collumn mood_id in the same table
-      const moodLinks = moodsId.map((id) => ({
-        daily_entry_id: newEntry.id,
-        mood_id: id,
-      }));
+    const recommendedTaskLinks = finalChatgptRecommendation.tasks.map(
+      (task) => ({
+        recommendation_id: aiRecommendation.id,
+        task_id: task.id,
+      })
+    );
 
-      //If there is content in the moodLinks
-      if (moodLinks.length > 0) {
-        //In the table daily_entry_moods, insert the content of moodLinks
-        await db("daily_entry_moods").insert(moodLinks);
-      }
+    console.log(recommendedTaskLinks);
+
+    if (recommendedTaskLinks.length > 0) {
+      await db("ai_recommended_tasks").insert(recommendedTaskLinks);
     }
-
-    //Get the emojis and the meaning of them
-    //First access the daily_entry_moods table
-    const entryMoods = await db("daily_entry_moods")
-      //1.Join the moods table + the mood_id collum in daily_entry_moods, and the id collumn in mood table
-      //2.Look in daily_entry_id collumn and match with current newJournal's id
-      //3.Get the asscosciated emojis and meaning for that newJournal entry
-      .join("moods", "daily_entry_moods.mood_id", "moods.id")
-      .where("daily_entry_moods.daily_entry_id", newEntry.id)
-      .select("moods.emojis", "moods.meaning");
-
-    //Get all the task for current user
-    const userTasks = await db("tasks").where({ user_id: userId }).select();
-
-    let allTaskCategories = [];
-    //Loop through al the task for current user
-    for (task of userTasks) {
-      //1.Access the table tasks_categories table
-      //2.Join the categories table + the category_id from tasks_categories table + id of the categories in categories table
-      //3.Look into the task_id column and match with the ids of the current users task
-      //4.Get the name and description of the categories for the current user's tasks
-      const taskCategories = await db("tasks_categories")
-        .join("categories", "tasks_categories.category_id", "categories.id")
-        .where("tasks_categories.task_id", task.id)
-        .select("categories.name", "categories.description");
-
-      allTaskCategories.push({ taskId: task.id, categories: taskCategories });
-    }
-
-    //Go through entryMoods and get the meaning for each mood
-    const selectedMoods = entryMoods.map((m) => m.meaning);
-
-    //Pass through selectedMoods to combineMoods function
-    const combined = combinedMoods(selectedMoods);
-
-    //Pass through combined to aiRecommendation funtion
-    const recommendationData = aiRecommendation(combined);
-
-    //Pass through recommendationData, taskCategories, moods, and newEntry to chatgpt function
-    const chatpgtRecommendations = await chatgpt({
-      recommendationData,
-      allTaskCategories,
-      moods: selectedMoods,
-      entry: newEntry.journal,
-      userTasks,
-    });
-
-    //Get all the ids of the tasks being returned from chatpgtRecommendations
-    const suggestedTasksId = chatpgtRecommendations.tasks.map(
-      (task) => task.id
-    );
-
-    //Get all the ids of the task of the current user
-    const realTasksId = userTasks.map((task) => {
-      return task.id;
-    });
-
-    //Filter out the ids of tasks from suggestedTasksId that does not exist in the ids of the current user's tasks
-    const existingIds = suggestedTasksId.filter((id) =>
-      realTasksId.includes(id)
-    );
-
-    //Use the ids from existingIds to filter out tasks that ai might have made up
-    const chatgptTasks = chatpgtRecommendations.tasks.filter((task) =>
-      existingIds.includes(task.id)
-    );
-
-    //Reassign the chatgptTasks into the chatpgtRecommendations tasks
-    const finalChatgptRecommendation = {
-      ...chatpgtRecommendations,
-      tasks: chatgptTasks,
-    };
 
     res.status(200).send({
-      data: { finalChatgptRecommendation },
+      message:
+        "Journal entry created and AI recommendations linked successfully.",
+      journalEntryId: entry.id,
+      recommendationId: aiRecommendation.id,
     });
   } catch (error) {
     console.log(error);
