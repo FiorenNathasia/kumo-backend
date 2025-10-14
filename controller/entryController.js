@@ -158,6 +158,45 @@ const newEntry = async (req, res) => {
   }
 };
 
+const getRecommendation = async (req, res) => {
+  const userId = res.locals.userId;
+  const entryId = req.params.id;
+
+  try {
+    const recommendation = await db("ai_recommendations")
+      .where({
+        user_id: userId,
+        daily_entry_id: entryId,
+      })
+      .select("id", "success", "message", "tone", "energy_level")
+      .first();
+
+    const tasks = await db("ai_recommended_tasks")
+      .join("tasks", "ai_recommended_tasks.task_id", "tasks.id")
+      .where("ai_recommended_tasks.recommendation_id", recommendation.id)
+      .select(
+        "tasks.id",
+        "tasks.title",
+        "tasks.difficulty",
+        "tasks.deadline",
+        "tasks.notes",
+        "ai_recommended_tasks.completed",
+        "ai_recommended_tasks.created_at"
+      );
+
+    res.status(200).send({
+      recommendation,
+      tasks,
+    });
+  } catch (error) {
+    return res
+      .status(400)
+      .send({ message: "Error getting ai recommendations" });
+  }
+};
+
+const getAllRecommendation = async (req, res) => {};
+
 const getEntry = async (req, res) => {
   const userId = res.locals.userId;
   const entryId = req.params.id;
@@ -285,6 +324,8 @@ const editEntry = async (req, res) => {
 
 module.exports = {
   newEntry,
+  getRecommendation,
+  getAllRecommendation,
   getEntry,
   getEntries,
   editEntry,
