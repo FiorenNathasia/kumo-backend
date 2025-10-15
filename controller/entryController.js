@@ -4,112 +4,21 @@ const { getUserTasksWithCategories } = require("../services/taskService");
 const {
   generateAIRecommendation,
 } = require("../services/aiRecommendationService");
-// const { combinedMoods } = require("../util/moodRulesLogic.js");
-// const { aiRecommendation } = require("../util/aiRecommendation.js");
-// const chatgpt = require("../util/openai.js");
 
 //POST new journal entry
 const newEntry = async (req, res) => {
   const userId = res.locals.userId;
   const { text, moods } = req.body;
+
   try {
-    // const entryDate = new Date().toISOString().split("T")[0];
-    // const entryText = text || "";
-    // const [newEntry] = await db("daily_entries")
-    //   .insert({
-    //     user_id: userId,
-    //     date: entryDate,
-    //     journal: entryText,
-    //   })
-    //   .returning("*");
-    // //If there are content in moods req.body,
-    // //And moods is an array,
-    // //And the length of moods req.body is greater than 0
-    // if (moods && Array.isArray(moods) && moods.length > 0) {
-    //   //Get the id of the inserted moods from moods table
-    //   //And match the inserted moods to the emojis collumn form the moods table
-    //   //Then take the id of the found matched emojis
-    //   const moodsId = await db("moods").whereIn("emojis", moods).pluck("id");
-    //   //Make a new variable
-    //   //Where you then map through the moodsId array
-    //   //You first set the id of the journal entry to the collum in the table(daily_entry_moods)
-    //   //And then the id of the emojis that has been inserted for the collumn mood_id in the same table
-    //   const moodLinks = moodsId.map((id) => ({
-    //     daily_entry_id: newEntry.id,
-    //     mood_id: id,
-    //   }));
-    //   //If there is content in the moodLinks
-    //   if (moodLinks.length > 0) {
-    //     //In the table daily_entry_moods, insert the content of moodLinks
-    //     await db("daily_entry_moods").insert(moodLinks);
-    //   }
-    // }
-    // //Get the emojis and the meaning of them
-    // //First access the daily_entry_moods table
-    // const entryMoods = await db("daily_entry_moods")
-    //   //1.Join the moods table + the mood_id collum in daily_entry_moods, and the id collumn in mood table
-    //   //2.Look in daily_entry_id collumn and match with current newJournal's id
-    //   //3.Get the asscosciated emojis and meaning for that newJournal entry
-    //   .join("moods", "daily_entry_moods.mood_id", "moods.id")
-    //   .where("daily_entry_moods.daily_entry_id", newEntry.id)
-    //   .select("moods.emojis", "moods.meaning");
-    // //Get all the task for current user
-    // const userTasks = await db("tasks").where({ user_id: userId }).select();
-    // let allTaskCategories = [];
-    // //Loop through al the task for current user
-    // for (task of userTasks) {
-    //   //1.Access the table tasks_categories table
-    //   //2.Join the categories table + the category_id from tasks_categories table + id of the categories in categories table
-    //   //3.Look into the task_id column and match with the ids of the current users task
-    //   //4.Get the name and description of the categories for the current user's tasks
-    //   const taskCategories = await db("tasks_categories")
-    //     .join("categories", "tasks_categories.category_id", "categories.id")
-    //     .where("tasks_categories.task_id", task.id)
-    //     .select("categories.name", "categories.description");
-    //   allTaskCategories.push({ taskId: task.id, categories: taskCategories });
-    // }
-    // //Go through entryMoods and get the meaning for each mood
-    // const selectedMoods = entryMoods.map((m) => m.meaning);
-    // //Pass through selectedMoods to combineMoods function
-    // const combined = combinedMoods(selectedMoods);
-    // //Pass through combined to aiRecommendation funtion
-    // const recommendationData = aiRecommendation(combined);
-    // //Pass through recommendationData, taskCategories, moods, and newEntry to chatgpt function
-    // const chatpgtRecommendations = await chatgpt({
-    //   recommendationData,
-    //   allTaskCategories,
-    //   moods: selectedMoods,
-    //   entry: newEntry.journal,
-    //   userTasks,
-    // });
-    // //Get all the ids of the tasks being returned from chatpgtRecommendations
-    // const suggestedTasksId = chatpgtRecommendations.tasks.map(
-    //   (task) => task.id
-    // );
-    // //Get all the ids of the task of the current user
-    // const realTasksId = userTasks.map((task) => {
-    //   return task.id;
-    // });
-    // //Filter out the ids of tasks from suggestedTasksId that does not exist in the ids of the current user's tasks
-    // const existingIds = suggestedTasksId.filter((id) =>
-    //   realTasksId.includes(id)
-    // );
-    // //Use the ids from existingIds to filter out tasks that ai might have made up
-    // const chatgptTasks = chatpgtRecommendations.tasks.filter((task) =>
-    //   existingIds.includes(task.id)
-    // );
-    // //Reassign the chatgptTasks into the chatpgtRecommendations tasks
-    // const finalChatgptRecommendation = {
-    //   ...chatpgtRecommendations,
-    //   tasks: chatgptTasks,
-    // };
-    // res.status(200).send({
-    //   data: { finalChatgptRecommendation },
-    // });
+    //Pass the userId, text, moods to createJournalEntry() to produce the entry and entryMoods
     const { entry, entryMoods } = await createJournalEntry(userId, text, moods);
+    //Pass the userId to getUserTasks and task and categories links which is allTaskCategories
     const { userTasks, allTaskCategories } = await getUserTasksWithCategories(
       userId
     );
+
+    //Pass entry, entryMoods, userTasks, allTaskCAtegories to generate ai recommedations to generateAiRecommendation
     const finalChatgptRecommendation = await generateAIRecommendation({
       entry,
       entryMoods,
@@ -117,8 +26,14 @@ const newEntry = async (req, res) => {
       allTaskCategories,
     });
 
-    console.log("AI RECOMMENDATION RESULT:", finalChatgptRecommendation);
-
+    //Insert the results of finalChatgptRecommendation into db (ai_recommendation)
+    //1. Set the user_id in the table with the current userId
+    //2. Set the daily_entry_id with the id of the current entry
+    //3. Get the success status from finalChatgptRecommendation and put it in the coresponding column
+    //4. Get the message from finalChatgptRecommendation and put it in the coresponding column
+    //5. Get the tone  value from finalChatgptRecommendation and put it in the coresponding column
+    //6. Get the energy_level value from finalChatgptRecommendation and put it in the coresponding column
+    //7. Put in the full JSON response into the raw_response column
     const [aiRecommendation] = await db("ai_recommendations")
       .insert({
         user_id: userId,
@@ -131,8 +46,9 @@ const newEntry = async (req, res) => {
       })
       .returning("*");
 
-    console.log(aiRecommendation);
-
+    //Create the link from the userTasks that correspond to the tasks from the finalChatgptRecommendation
+    //1. Map through the tasks in finalChatgptRecommendation
+    //2. Assign the recommendation_id to the corresponding task_id in finalChatgptRecommendation
     const recommendedTaskLinks = finalChatgptRecommendation.tasks.map(
       (task) => ({
         recommendation_id: aiRecommendation.id,
@@ -140,8 +56,8 @@ const newEntry = async (req, res) => {
       })
     );
 
-    console.log(recommendedTaskLinks);
-
+    //If there are more than 0 recommendedTaskLinks
+    //Access the ai_recommended_tasks table and insert the links
     if (recommendedTaskLinks.length > 0) {
       await db("ai_recommended_tasks").insert(recommendedTaskLinks);
     }
@@ -163,6 +79,8 @@ const getRecommendation = async (req, res) => {
   const entryId = req.params.id;
 
   try {
+    //From the ai_recommendations table with the current user_id & daily_entry_id
+    //And get the first match id, success status, message, tone, and energy_level
     const recommendation = await db("ai_recommendations")
       .where({
         user_id: userId,
@@ -171,6 +89,11 @@ const getRecommendation = async (req, res) => {
       .select("id", "success", "message", "tone", "energy_level")
       .first();
 
+    //In the ai_recommended_tasks...
+    //Join the id of tasks in tasks table with the task_id in the ai_recommended_tasks
+    //And where the recommendation id from above with the recommendation_id in the ai_recommended_tasks table
+    //And select the id, title, difficulty, and notes of the tasks and the completed status and created_at from ai_recommended_tasks
+    //This is the how to get the list of tasks from the ai recommendation made fro, the current entry
     const tasks = await db("ai_recommended_tasks")
       .join("tasks", "ai_recommended_tasks.task_id", "tasks.id")
       .where("ai_recommended_tasks.recommendation_id", recommendation.id)
