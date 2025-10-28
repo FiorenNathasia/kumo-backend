@@ -11,6 +11,23 @@ const newEntry = async (req, res) => {
   const { text, moods } = req.body;
 
   try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const exist = await db("ai_recommendations")
+      .where({
+        user_id: userId,
+      })
+      .andWhere("created_at", ">=", startOfDay)
+      .andWhere("created_at", "<=", endOfDay)
+      .first();
+
+    if (exist) {
+      return res.status(409).json({ message: "Mood already submitted today" });
+    }
     //Pass the userId, text, moods to createJournalEntry() to produce the entry and entryMoods
     const { entry, entryMoods } = await createJournalEntry(userId, text, moods);
     //Pass the userId to getUserTasks and task and categories links which is allTaskCategories
@@ -103,7 +120,7 @@ const getRecommendation = async (req, res) => {
         "tasks.difficulty",
         "tasks.deadline",
         "tasks.notes",
-        "ai_recommended_tasks.completed",
+        "tasks.completed",
         "ai_recommended_tasks.created_at"
       );
 

@@ -54,7 +54,13 @@ const getTask = async (req, res) => {
       .where({ id: taskId, user_id: userId })
       .select()
       .first();
-    res.status(200).send({ data: task });
+
+    const categories = await db("tasks_categories")
+      .join("categories", "tasks_categories.category_id", "categories.id")
+      .where("tasks_categories.task_id", taskId)
+      .select("categories.id", "categories.name", "categories.description");
+
+    res.status(200).send({ data: { ...task, categories } });
   } catch (error) {
     console.log(error);
     res.status(500).send({ message: "Error getting task" });
@@ -109,10 +115,47 @@ const deleteTask = async (req, res) => {
   }
 };
 
+const completeTask = async (req, res) => {
+  const userId = res.locals.userId;
+  const taskId = req.params.id;
+  const { completed } = req.body;
+
+  try {
+    const task = await db("tasks")
+      .where({
+        id: taskId,
+        user_id: userId,
+      })
+      .select();
+
+    if (task.length === 0) {
+      return res
+        .status(404)
+        .send({ message: `Task with ID ${taskId} not found` });
+    }
+
+    const updatedTask = await db("tasks")
+      .where({
+        id: taskId,
+        user_id: userId,
+      })
+      .update({ completed });
+
+    if (updatedTask) {
+      res.status(200).send({ id: taskId, completed });
+    } else {
+      res.status(404).send({ message: "Task not found" });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 module.exports = {
   newTask,
   getTask,
   getAllTasks,
   editTask,
   deleteTask,
+  completeTask,
 };
