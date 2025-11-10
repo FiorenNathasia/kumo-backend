@@ -71,11 +71,21 @@ const getAllTasks = async (req, res) => {
   const userId = res.locals.userId;
 
   try {
-    const tasks = await db("tasks")
+    const tasks = await db("tasks as t")
+      .leftJoin("tasks_categories as tc", "t.id", "tc.task_id")
+      .leftJoin("categories as c", "tc.category_id", "c.id")
       .where({
-        user_id: userId,
+        "t.user_id": userId,
       })
-      .select();
+      .select(
+        "t.id",
+        "t.title",
+        "t.completed",
+        "t.deadline",
+        "t.notes",
+        "c.id as categoryId",
+        "c.name as categoryName"
+      );
 
     res.status(200).send({ data: tasks });
   } catch (error) {
